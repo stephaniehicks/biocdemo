@@ -1,0 +1,180 @@
+---
+title: "Large-scale clustering in Bioconductor"
+author: "Davide Risso and Stephanie Hicks"
+date: "Last modified: November 18, 2020; Compiled: `r format(Sys.time(), '%B %d, %Y')`"
+output:
+  rmarkdown::html_document:
+   highlight: pygments
+   toc: true
+   toc_depth: 3
+   fig_width: 5
+vignette: >
+  %\VignetteIndexEntry{CZI Seed Network Meeting 2020 Demo}
+  %\VignetteEncoding[ut8]{inputenc}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Introduction
+
+In this demo, we will showcase an end-to-end clustering pipeline, starting from the count data matrix stored in HDF5 (similar to what one would download from the HCA data portal) all the way to visualization and interpretation of the clustering results.
+
+While we use a small-ish dataset for this demo for convenience, the code is computationally efficient even for (very) large datasets.
+
+```{r packages}
+library(SingleCellExperiment)
+library(TENxPBMCData)
+library(scater)
+library(scran)
+library(scry)
+library(NewWave)
+library(mbkmeans)
+```
+
+## Getting the data
+
+```{r data}
+sce <- TENxPBMCData("pbmc4k")
+sce
+counts(sce)
+seed(counts(sce))
+```
+
+## Filtering and normalization
+
+### Removing low-quality cells
+
+First, we use the `scater` package to compute a set of 
+QC measures and filter out the low-quality samples.
+
+Here, we exclude those cells that have a too high percentage of mitochondrial genes or for which we detect too few genes.
+
+```{r filter}
+sce <- addPerCellQC(sce, 
+            subsets = list(Mito = grep("^MT-", rowData(sce)$Symbol_TENx)))
+high_mito <- isOutlier(sce$subsets_Mito_percent, 
+                       nmads = 3, type="higher")
+low_detection <- (sce$detected < 1000)
+high_counts <- sce$sum > 45000
+sce <- sce[,!high_mito & !low_detection & !high_counts]
+sce
+```
+
+### Removing lowly expressed genes
+
+Next, we remove the lowly expressed genes. Here, 
+we keep only those genes that have at least 1 UMI 
+in at least 5% of the data. These threshold are
+dataset-specific and may need to be taylored to 
+specific applications.
+
+```{r qc-gene-filter}
+num_reads <- 1
+num_cells <- 0.01*ncol(sce)
+keep <- which(DelayedArray::rowSums(counts(sce) >= num_reads ) >= num_cells)
+sce <- sce[keep,]
+sce
+```
+
+These leaves us with `length(keep)` genes.
+
+### Normalization
+
+Here, we apply `mbkmeans` (`k=10` and batch size of 500) as a preliminary step to `scran` normalization.
+
+```{r mbkmeans_full}
+set.seed(18)
+mbk <- mbkmeans(sce, whichAssay = "counts", reduceMethod = NA,
+                  clusters=10, batch_size = 500)
+sce$mbk10 <- paste0("mbk", mbk$Clusters)
+table(mbk$Clusters)
+```
+
+We then compute the normalization factors and normalize the data.
+
+```{r scran}
+sce <- computeSumFactors(sce, cluster=mbk$Clusters, min.mean=0.1)
+sce <- logNormCounts(sce)
+sce
+```
+
+## Dimensionality reduction
+
+### PCA on normalized values
+
+Here, we compute the first 50 principal components using the top variable genes.
+
+```{r pca}
+sce <- scater::runPCA(sce, ncomponents = 50,
+                      ntop = 1000,
+                      scale = TRUE,
+                      BSPARAM = BiocSingular::RandomParam())
+plotPCA(sce, colour_by = "mbk10")
+```
+
+### GLM-PCA
+
+```{r glmpca}
+sce <- nullResiduals(sce, assay="counts", type="deviance")
+sce <- scater::runPCA(sce, ncomponents = 50,
+                      ntop = 1000,
+                      exprs_values = "binomial_deviance_residuals",
+                      scale = TRUE, name = "GLM-PCA",
+                      BSPARAM = BiocSingular::RandomParam())
+plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "mbk10")
+```
+
+### ZINB-WaVE
+
+```{r newwave, eval=FALSE}
+dec <- modelGeneVar(sce)
+hvg <- getTopHVGs(dec, n=1000)
+sce_red <- sce[hvg,]
+
+sce_red <- newWave(sce_red, K=2,
+               n_gene_disp = 100,
+               n_gene_par = 100, 
+               n_cell_par = 100)
+plotReducedDim(sce_red, dimred = "NewWave", colour_by = "mbk10")
+```
+
+## Clustering
+
+Here, we use the GLM-PCA results to obtain the final cluster labels. We use two alternative approaches: Louvain and mini-batch k-means.
+
+```{r louvain}
+g <- buildSNNGraph(sce, k=10, use.dimred = "GLM-PCA")
+lou <- igraph::cluster_louvain(g)
+sce$louvain <- paste0("Louvain", lou$membership)
+table(sce$louvain)
+```
+
+```{r select_k}
+k_list <- seq(5, 20)
+km_res <- lapply(k_list, function(k) {
+    mbkmeans(sce, clusters = k, 
+             batch_size = 500,
+             reduceMethod = "GLM-PCA",
+             calc_wcss = TRUE)
+})
+wcss <- sapply(km_res, function(x) sum(x$WCSS_per_cluster))
+plot(k_list, wcss, type = "b")
+```
+
+```{r minibatch}
+sce$kmeans <- paste0("mbk", km_res[[which(k_list==13)]]$Clusters)
+table(sce$kmeans)
+table(sce$kmeans, sce$louvain)
+
+plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "louvain")
+plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "kmeans")
+```
+
+## Cluster interpretation
+
+
