@@ -32,7 +32,6 @@ library(TENxPBMCData)
 library(scater)
 library(scran)
 library(scry)
-library(NewWave)
 library(mbkmeans)
 ```
 
@@ -129,23 +128,9 @@ sce <- scater::runPCA(sce, ncomponents = 50,
 plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "mbk10")
 ```
 
-### ZINB-WaVE
-
-```{r newwave, eval=FALSE}
-dec <- modelGeneVar(sce)
-hvg <- getTopHVGs(dec, n=1000)
-sce_red <- sce[hvg,]
-
-sce_red <- newWave(sce_red, K=2,
-               n_gene_disp = 100,
-               n_gene_par = 100, 
-               n_cell_par = 100)
-plotReducedDim(sce_red, dimred = "NewWave", colour_by = "mbk10")
-```
-
 ## Clustering
 
-Here, we use the GLM-PCA results to obtain the final cluster labels. We use two alternative approaches: Louvain and mini-batch k-means.
+Here, we use the GLM-PCA results to obtain the final cluster labels. We use two alternative approaches: Louvain and mini-batch _k_-means.
 
 ```{r louvain}
 g <- buildSNNGraph(sce, k=10, use.dimred = "GLM-PCA")
@@ -177,4 +162,8 @@ plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "kmeans")
 
 ## Cluster interpretation
 
+## Session info 
+```{r}
+sessionInfo()
+```
 

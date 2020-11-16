@@ -1,0 +1,15 @@
+url: https://stephaniehicks.com/biocdemo
+
+template:
+  params:
+    bootswatch: flatly
+
+home:
+  title: "Large-scale clustering in Bioconductor"
+  type: inverse
+
+
+navbar:
+  right:
+   - icon: fa-github
+     href: https://github.com/stephaniehicks/biocdemo

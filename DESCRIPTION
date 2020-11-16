@@ -1,11 +1,25 @@
 Package: biocdemo
 Type: Package
-Title: What the Package Does (Title Case)
-Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Title: Large-scale clustering in Bioconductor
+Version: 0.99.0
+Authors@R: c(
+    person(c("Stephanie", "C."), "Hicks", role = c("aut", "cre"),
+    email = "shicks19@jhu.edu",
+    comment = c(ORCID = "0000-0002-7858-0231")),
+    person("Davide", "Risso", role = "aut",
+    comment = c(ORCID = "0000-0001-8508-5012")))
+Description: This is a demo of large-scale clustering in Bioconductor. 
+Imports:
+  SingleCellExperiment,
+  TENxPBMCData, 
+  scater,
+  scran,
+  scry,
+  mbkmeans
+Suggests:
+    pkgdown,
+    TENxBrainData
+License: Artistic-2.0
+VignetteBuilder: knitr
 Encoding: UTF-8
-LazyData: true
+URL: https://stephaniehicks.com/biocdemo/

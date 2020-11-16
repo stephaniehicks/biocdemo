@@ -1,0 +1,10 @@
+pandoc: 2.9.2.1
+pkgdown: 1.6.1
+pkgdown_sha: ~
+articles:
+  Demo: Demo.html
+last_built: 2020-11-16T17:39Z
+urls:
+  reference: https://stephaniehicks.com/biocdemo/reference
+  article: https://stephaniehicks.com/biocdemo/articles
+
