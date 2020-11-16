@@ -44,6 +44,16 @@ counts(sce)
 seed(counts(sce))
 ```
 
+In this demo we use a small dataset for the sake of running all the code in a short amount of time. However, this workflow is designed for large data and it will run just fine with any sized dataset. For instance, we have analyzed 1.3 million cells on a machine with a moderately sized RAM (e.g., 64GB).
+
+By running the code below, you will run the workflow on the 10X Genomics 1.3 million cells dataset. (Warning: it takes some time!) Alternatively, you can substitute the code below with your own data in `SingleCellExperiment` format.
+
+```{r million, eval=FALSE}
+library(TENxBrainData)
+sce <- TENxBrainData()
+sce
+```
+
 ## Filtering and normalization
 
 ### Removing low-quality cells
@@ -118,6 +128,10 @@ plotPCA(sce, colour_by = "mbk10")
 
 ### GLM-PCA
 
+An alternative to PCA on normalized data is to use the GLM-PCA approach, implemented in the `scry` Bioconductor package. Here, we use the faster, approximate approach that computes the null residuals and runs PCA on them.
+
+Other approaches implemented in Bioconductor for dimensionality reduction include correspondence analysis (in the `corral` package) and ZINB-WaVE (in the `zinbwave` and `NewWave` packages).
+
 ```{r glmpca}
 sce <- nullResiduals(sce, assay="counts", type="deviance")
 sce <- scater::runPCA(sce, ncomponents = 50,
@@ -132,12 +146,22 @@ plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "mbk10")
 
 Here, we use the GLM-PCA results to obtain the final cluster labels. We use two alternative approaches: Louvain and mini-batch _k_-means.
 
+### Louvain
+
 ```{r louvain}
 g <- buildSNNGraph(sce, k=10, use.dimred = "GLM-PCA")
 lou <- igraph::cluster_louvain(g)
 sce$louvain <- paste0("Louvain", lou$membership)
 table(sce$louvain)
 ```
+
+If you want more control on the resolution of the clustering, you can use the Louvain implementation available in the `resolution` package. Alternatively, the `leiden` package implements the Leiden algorithm.
+
+### Mini-batch k-means
+
+Mini-batch $k$-means is a faster version of $k$-means that uses only a random "mini-batch" of data at each iteration. The algorithm is fast enough to cluster the 1.3 million cell data in the space of the top 50 PC in under 30 seconds.
+
+Here, we run it multiple times to select the value of $k$ with the elbow method.
 
 ```{r select_k}
 k_list <- seq(5, 20)
@@ -161,6 +185,30 @@ plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "kmeans")
 ```
 
 ## Cluster interpretation
+
+To interpret the 13 clusters, we start by computing a list of markers.
+
+```{r markers}
+sce <- sce[,!(sce$kmeans %in% c("mbk11", "mbk2", "mbk5"))]
+colLabels(sce) <- sce$kmeans
+markers <- findMarkers(sce, pval.type="all", direction="up")
+
+chosen <- "mbk1"
+interesting <- markers[[chosen]]
+interesting[1:10,1:3]
+
+top10 <- rownames(interesting[1:10,])
+rowData(sce[top10,])
+
+library(pheatmap)
+means <- t(apply(logcounts(sce[c(top10,"ENSG00000177455"),]), 1, tapply, sce$kmeans, mean))
+rownames(means) <- rowData(sce[c(top10,"ENSG00000177455"),])$Symbol_TENx
+pheatmap(means, scale = "row")
+```
+
+The presence of CD40, IL4R suggests that these are activated B-cells.
+
+Similar analyses can be carried out for all clusters.
 
 ## Session info 
 ```{r}
