@@ -179,9 +179,26 @@ plot(k_list, wcss, type = "b")
 sce$kmeans <- paste0("mbk", km_res[[which(k_list==13)]]$Clusters)
 table(sce$kmeans)
 table(sce$kmeans, sce$louvain)
+```
 
-plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "louvain")
-plotReducedDim(sce, dimred = "GLM-PCA", colour_by = "kmeans")
+## Cluster visualization
+
+We can use UMAP or t-SNE to visualize the clusters.
+
+```{r umap}
+sce <- scater::runUMAP(sce, dimred = "GLM-PCA", 
+                       external_neighbors = TRUE,
+                       BNPARAM = BiocNeighbors::AnnoyParam())
+plotUMAP(sce, colour_by = "louvain")
+plotUMAP(sce, colour_by = "kmeans")
+```
+
+```{r tsne}
+sce <- scater::runTSNE(sce, dimred = "GLM-PCA", 
+                       external_neighbors = TRUE,
+                       BNPARAM = BiocNeighbors::AnnoyParam())
+plotTSNE(sce, colour_by = "louvain")
+plotTSNE(sce, colour_by = "kmeans")
 ```
 
 ## Cluster interpretation
