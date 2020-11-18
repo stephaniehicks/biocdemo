@@ -1,7 +1,7 @@
 ---
 title: "Large-scale clustering in Bioconductor"
 author: "Davide Risso and Stephanie Hicks"
-date: "Last modified: November 18, 2020; Compiled: `r format(Sys.time(), '%B %d, %Y')`"
+date: "Last modified: November 17, 2020; Compiled: `r format(Sys.time(), '%B %d, %Y')`"
 output:
   rmarkdown::html_document:
    highlight: pygments
